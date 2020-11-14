@@ -63,82 +63,84 @@ pthread_mutex_t mutex3 = PTHREAD_MUTEX_INITIALIZER;
 // initialize the condition variable for buffer 3
 pthread_cond_t full3 = PTHREAD_COND_INITIALIZER;
 
+//
 
+//SECOND ATTEMPT
 /************************************************************
- * function to replace an instance of a substring with
- * a designated replacement substring
- * returns pointer to char
+   function to get data from the buffer shared with th line separator thread
+   (buffer 2), change every instance of '++' to '^', and put the
+   resulting string into the buffer shared with the output thread (buffer 3)
 *************************************************************/
-char* swapSubstrs(char* inputStr, char* replaceMeStrPos, char replacementChar)
-{
-     // ADD AN IF STATEMENT TO REETURN IF REPLACE ME STRING IS AT THE END OF INPUT STRING.
+void replaceSubstrs() {
+     //char replaceUsStr[] = "+";   //input substring that will be replaced
+     //char replacementChar = '^';   //input substring that will replace
 
-     // allocate memory for the result string before shortening input string
-     char* resultStr = calloc(strlen(inputStr) + 1 + 1 + 1, sizeof(char)); // too long?
-     // WHEN TO FREE THIS??
+     int iArr2 = 0;   // array index var for buffer 2
+     int jArr3 = 0;    // array index var for buffer 3
 
-     // add pointer to string just after the string to be replaced
-     char* resultStrPart3 = replaceMeStrPos + 2;
+     /* loop repeats until all instances are replaced, or the
+        "end of text" char (acii value 3) is encountered
+      */
+     while (buffer1[iArr2] != 3) {
 
-     // Terminate input string right before the "replace me" string
-     *replaceMeStrPos = '\0';
-
-     /* assemble the result string
-     source: https://www.geeksforgeeks.org/how-to-append-a-character-to-a-string-in-c/
-     */
-     strcpy(resultStr, inputStr);       // the part before the string being replaced
-     strncat(resultStr, &replacementChar, 1);  // the replacement char
-     strcat(resultStr, resultStrPart3); // just the part after the string being replaced
-
-     //free(inputStr);   // DO I NEED TO BRING THIS BACK LATER?
-
-     return resultStr;
-}
-
-
-/************************************************************
- * function to identify the position of a designated substring
- * and call another function to replace the substring with a
- * designated character. Repeats until all instances are processed
-*************************************************************/
-void replaceSubstrs(char* inputStr, char replaceMeStr[], char replacementChar) {
-
-     //int i = 1;
-     // loop repeats until all instances are replaced. */
-     while (1)
-     //while(i < 4)
-     {
-          char *replaceMeStrPos = strstr(inputStr, replaceMeStr);
-          if (replaceMeStrPos)
-          {
-               /* an instance of replaceMeStr is found. call the
-                  function to replace it */
-               //printf("  found a '++'\n");
-               char* newInputStr = swapSubstrs(inputStr, replaceMeStrPos, replacementChar);
-
-               // point the old pointer to the new string
-               inputStr = newInputStr;
+          if (buffer1[iArr2] == '+' && buffer1[iArr2 + 1] == '+') {
+               buffer2[jArr3] = '^';
+               iArr2++;    // an extra increment to skip the 2nd '+'
           }
           else
           {
-               // there are no more instances of replaceMeStr to be found
-               break;
+               buffer2[jArr3] = buffer1[iArr2];
           }
+          iArr2++;
+          jArr3++;
      }    // end of while loop
-
+     printf("buffer 2: %s\n", buffer2);
 
      return;
 }
 
+//******************************************************************************************************
+//     /*     char* replaceMeStrPos = strstr(inputStr, replaceMeStr);
+//          if (replaceMeStrPos)*/
+//          {
+//               // an instance of replaceMeStr is found.
+//               //printf("  found a '++'\n");
+//
+//
+//
+//
+//
+//
+//               //char* newInputStr = swapSubstrs(inputStr, replaceMeStrPos, replacementChar);
+//               //// point the old pointer to the new string
+//               //inputStr = newInputStr;
+//          }
+//          else
+//          {
+//               /* there are no more instances of replaceMeStr to be found.
+//                  store the string to buffer 1 */
+//               int i = 0;     // string incrementer and array index
+//               for (i = 1; i < strlen(inputStr); i++) {
+//                    buffer2[i] = inputStr[i];
+//               }
+//
+//               break;
+//          }
+//     }    // end of while loop
+//
+//     printf("leaving the fn replaceSubstrs, inputStr == %s\n", inputStr);
+//
+//     return;
+//}
 
-// Buffer 1, shared resource between input thread and line separator thread
 
-
+//*****************************************************************************************************
 
 
 /************************************************************
  * function to get lines of text from std input and 
- * place them in a the buffer shared with the Line Separator thread
+ * place them in a the buffer shared with the Line Separator
+ * thread (buffer 1)
 *************************************************************/
 void readInput() {
      /* get the first line of characters, including the line
@@ -184,7 +186,7 @@ void readInput() {
 
 
 /************************************************************
-   function to get input from the buffer shared with Input Thread (buffer 1)
+   function to get data from the buffer shared with Input Thread (buffer 1)
    and replace every line separator in the input with a space.
    Puts resulting string in the buffer shared with Plus Sign Thread (buffer 2).
    source: https://www.codingame.com/playgrounds/14213/how-to-play-with-strings-in-c/search-within-a-string

@@ -20,17 +20,9 @@
 
 int main()
 {
-     printf("\nHello world!\n\n");
-
-
      readInput();
-     printf("HEEEEEEEEEEEEERE1\n");
      replaceLineSeparators();
-
-     //char replaceMeStr[] = "++";   //input substring that will be replaced
-     //char replacementChar = '^';   //input substring that will replace
-     //char* newString;
-     //replaceSubstrs(inputStr, replaceMeStr, replacementChar);
+     replaceSubstrs();
      
     //return EXIT_SUCCESS;
      return 0;
