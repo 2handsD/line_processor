@@ -17,13 +17,12 @@
 */
 #include "line_processor.h"
 
-
 int main()
 {
      readInput();
      replaceLineSeparators();
      replaceSubstrs();
+     printOutput();
      
-    //return EXIT_SUCCESS;
-     return 0;
+    return EXIT_SUCCESS;
 }

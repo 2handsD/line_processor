@@ -51,7 +51,7 @@ pthread_cond_t full2 = PTHREAD_COND_INITIALIZER;
 
 
 // Buffer 3, shared resource between plus sign thread thread and output thread
-char bufferC[MAX_LINES * MAX_CHARACTERS_PER_LINE];
+char buffer3[MAX_LINES * MAX_CHARACTERS_PER_LINE];
 // number of items in the buffer
 int count3 = 0;
 // index where the plus sign thread will put the next item
@@ -63,78 +63,8 @@ pthread_mutex_t mutex3 = PTHREAD_MUTEX_INITIALIZER;
 // initialize the condition variable for buffer 3
 pthread_cond_t full3 = PTHREAD_COND_INITIALIZER;
 
-//
-
-//SECOND ATTEMPT
-/************************************************************
-   function to get data from the buffer shared with th line separator thread
-   (buffer 2), change every instance of '++' to '^', and put the
-   resulting string into the buffer shared with the output thread (buffer 3)
-*************************************************************/
-void replaceSubstrs() {
-     //char replaceUsStr[] = "+";   //input substring that will be replaced
-     //char replacementChar = '^';   //input substring that will replace
-
-     int iArr2 = 0;   // array index var for buffer 2
-     int jArr3 = 0;    // array index var for buffer 3
-
-     /* loop repeats until all instances are replaced, or the
-        "end of text" char (acii value 3) is encountered
-      */
-     while (buffer1[iArr2] != 3) {
-
-          if (buffer1[iArr2] == '+' && buffer1[iArr2 + 1] == '+') {
-               buffer2[jArr3] = '^';
-               iArr2++;    // an extra increment to skip the 2nd '+'
-          }
-          else
-          {
-               buffer2[jArr3] = buffer1[iArr2];
-          }
-          iArr2++;
-          jArr3++;
-     }    // end of while loop
-     printf("buffer 2: %s\n", buffer2);
-
-     return;
-}
-
-//******************************************************************************************************
-//     /*     char* replaceMeStrPos = strstr(inputStr, replaceMeStr);
-//          if (replaceMeStrPos)*/
-//          {
-//               // an instance of replaceMeStr is found.
-//               //printf("  found a '++'\n");
-//
-//
-//
-//
-//
-//
-//               //char* newInputStr = swapSubstrs(inputStr, replaceMeStrPos, replacementChar);
-//               //// point the old pointer to the new string
-//               //inputStr = newInputStr;
-//          }
-//          else
-//          {
-//               /* there are no more instances of replaceMeStr to be found.
-//                  store the string to buffer 1 */
-//               int i = 0;     // string incrementer and array index
-//               for (i = 1; i < strlen(inputStr); i++) {
-//                    buffer2[i] = inputStr[i];
-//               }
-//
-//               break;
-//          }
-//     }    // end of while loop
-//
-//     printf("leaving the fn replaceSubstrs, inputStr == %s\n", inputStr);
-//
-//     return;
-//}
 
 
-//*****************************************************************************************************
 
 
 /************************************************************
@@ -148,32 +78,24 @@ void readInput() {
      source: C for Dummies Blog; https://c-for-dummies.com/blog/?p=1112 */
      
      size_t buf1Size = MAX_LINES * MAX_CHARACTERS_PER_LINE;  // must agree with buffer declaration
+
      //char buffer1[bufSize];
-     char* bufPointer = buffer1;  //this pointer starts at the beginning of the array
-     size_t curLineSize;      // size, in chars, of the current line of input
-     int nextBufIndex = 0;    // index num of next array element
+     char* bufPointer = buffer1;   //this pointer starts at the beginning of the array
+     size_t curLineSize;           // size, in chars, of the current line of input
+     int nextBufIndex = 0;         // index num of next array element
      char stopProcessingLine[] = { 'S','T','O','P','\n' };
 
      while (1) {
           /* get the lines of input from stdin, store them
              in the buffer shared with the Line Separator thread */
-          printf("Type something: ");
           curLineSize = getline(&bufPointer, &buf1Size, stdin);
-          printf("curLine Size:%zu\n", curLineSize);   // %zu for printing size_t
 
           if (strcmp(bufPointer, stopProcessingLine) == 0) {
                break;
           }
           else {
-               //printf("%zu characters were read.\n", curLineSize);
-               //printf("strlen(buffer1): %d\n", strlen(buffer1));
-               printf("&buffer1[0]: %s\n", &buffer1[0]);
-               //printf("before advancing, &buffer1[nextBufIndex] = %s\n", &buffer1[nextBufIndex]);
-
                nextBufIndex += curLineSize;
                bufPointer = &buffer1[nextBufIndex];
-
-               printf("\n");
           } // end of if-else
 
      } // end of while loop
@@ -181,6 +103,7 @@ void readInput() {
      /* replace bufPointer with an unprintable char's ascii code
         This will mark the 'end of text' for other threads*/
      *bufPointer = 3;
+
      return;
 }
 
@@ -210,21 +133,79 @@ void replaceLineSeparators() {
 
           i++;
      }
-     printf("\nafter replaceLineSeparators, buffer2 == %s\n", buffer2);
+     buffer2[i] = buffer1[i];  // transfer the "end of text" char
 
      return;
 }
 
 
+/******************************************************
+ * function to get data from the buffer shared with the line separator
+ * thread (buffer 2), change every instance of '++' to '^', and put the
+ * resulting string into the buffer shared with the output thread (buffer 3)
+ ******************************************************/
+
+void replaceSubstrs() {
+     int buf2Indx = 0;	// index for buffer 2
+     int buf3Indx = 0;   // index for buffer 3
+
+     /* loop repeats until all instances are replaced, or thef
+        "end of text" char (ascii value 3) is encountered
+     */
+     while (buffer2[buf2Indx] != 3) {
+          if (buffer2[buf2Indx] == '+' && buffer2[buf2Indx + 1] == '+') {
+               buffer3[buf3Indx] = '^';
+               buf2Indx++;	// an extra increment to skip the 2nd '+'
+          }
+          else
+          {
+               buffer3[buf3Indx] = buffer2[buf2Indx];
+
+          }
+          buf2Indx++;
+          buf3Indx++;
+     }	// end of while loop
+     buffer3[buf3Indx] = buffer2[buf2Indx];  // transfer the "end of text" char
+     buffer3[buf3Indx] = buffer2[buf2Indx];  // extra transfer(?)
+
+     return;
+}
+
 
 /************************************************************
- * function to get processed data from the buffer shared with 
+ * function to get processed data from the buffer shared with
  * Plus Sign Thread and write it to std output as lines of
  * exactly 80 characters. excess characters at the end numbering
  * fewer than 80 are ignored.
 *************************************************************/
+void printOutput() {
+     int charsPerLine = 80;
+     char tempBuffer[charsPerLine + 1];  // Adds room for null terminator
+     tempBuffer[80] = '\0';   // null terminator at the end
 
+     int buf3Indx = 0;   // array index var for buffer 3
+     int tempBufIndx = 0;    // array index var for temporary buffer
+
+     int k = 0;     // counter of all chars in the input
+     while (1) {
+          for(; tempBufIndx < charsPerLine; tempBufIndx++){ // loop of n-char line
+               //check for EOT character
+               if (buffer3[buf3Indx] == 3) {
+                    return;
+               }
+               
+               tempBuffer[tempBufIndx] = buffer3[buf3Indx];
+               buf3Indx++;
+               k++;
+          }
+
+          // print the 80-char line to std output
+          printf("%s\n",tempBuffer);
+
+          // reset the temp buffer to beginning for next n-char line;
+          tempBufIndx = 0;
+     } // end of while loop
+
+}
 
 #endif
-
-
