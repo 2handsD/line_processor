@@ -36,7 +36,7 @@ pthread_mutex_t mutex1 = PTHREAD_MUTEX_INITIALIZER;
 // initialize the condition variable for buffer 1
 pthread_cond_t full1 = PTHREAD_COND_INITIALIZER;
 
-// size of buffer 2
+// Buffer 2, shared resource between line separator thread and plus sign thread
 char buffer2[MAX_LINES * MAX_CHARACTERS_PER_LINE];
 // number of items in the buffer
 int count2 = 0;
@@ -50,7 +50,7 @@ pthread_mutex_t mutex2 = PTHREAD_MUTEX_INITIALIZER;
 pthread_cond_t full2 = PTHREAD_COND_INITIALIZER;
 
 
-// Buffer 3, shared resource between plus sign thread thread and output thread
+// Buffer 3, shared resource between plus sign thread and output thread
 char buffer3[MAX_LINES * MAX_CHARACTERS_PER_LINE];
 // number of items in the buffer
 int count3 = 0;
@@ -64,13 +64,10 @@ pthread_mutex_t mutex3 = PTHREAD_MUTEX_INITIALIZER;
 pthread_cond_t full3 = PTHREAD_COND_INITIALIZER;
 
 
-
-
-
 /************************************************************
- * function to get lines of text from std input and 
- * place them in a the buffer shared with the Line Separator
- * thread (buffer 1)
+ * Function that the input thread will run. Get lines of text
+ * from std input and place them in a the buffer shared with
+ * the Line Separator thread (buffer 1)
 *************************************************************/
 void readInput() {
      /* get the first line of characters, including the line
@@ -84,6 +81,8 @@ void readInput() {
      size_t curLineSize;           // size, in chars, of the current line of input
      int nextBufIndex = 0;         // index num of next array element
      char stopProcessingLine[] = { 'S','T','O','P','\n' };
+
+     //*************************beginning of critical section
 
      while (1) {
           /* get the lines of input from stdin, store them
@@ -104,15 +103,18 @@ void readInput() {
         This will mark the 'end of text' for other threads*/
      *bufPointer = 3;
 
+     //**************************end of critical section
+
      return;
 }
 
 
 /************************************************************
-   function to get data from the buffer shared with Input Thread (buffer 1)
-   and replace every line separator in the input with a space.
-   Puts resulting string in the buffer shared with Plus Sign Thread (buffer 2).
-   source: https://www.codingame.com/playgrounds/14213/how-to-play-with-strings-in-c/search-within-a-string
+ *  function that the line separator thread will run. Get data
+ *  from the buffer shared with Input Thread (buffer 1) and
+ *  replace every line separator in the input with a space.
+ *  Puts resulting string in the buffer shared with the plus
+ *  sign thread (buffer 2).
 *************************************************************/
 void replaceLineSeparators() {
 
@@ -120,6 +122,8 @@ void replaceLineSeparators() {
      char replacementChar = ' ';
 
      int i = 0;     // array index
+
+     //*************************beginning of critical section
 
      //loop until designated "end of text" ascii code is found
      while (buffer1[i] != 3) {  
@@ -135,23 +139,31 @@ void replaceLineSeparators() {
      }
      buffer2[i] = buffer1[i];  // transfer the "end of text" char
 
+     //**************************end of critical section
+
+
      return;
 }
 
 
 /******************************************************
- * function to get data from the buffer shared with the line separator
- * thread (buffer 2), change every instance of '++' to '^', and put the
- * resulting string into the buffer shared with the output thread (buffer 3)
+ * Function that the plus sign thread will run. Get data
+ * from the buffer shared with the line separator thread
+ * (buffer 2), change every instance of '++' to '^', and
+ * put the resulting string into the buffer shared with
+ * the output thread (buffer 3)
  ******************************************************/
 
 void replaceSubstrs() {
      int buf2Indx = 0;	// index for buffer 2
      int buf3Indx = 0;   // index for buffer 3
 
-     /* loop repeats until all instances are replaced, or thef
+     /* loop repeats until all instances are replaced, or the
         "end of text" char (ascii value 3) is encountered
      */
+
+     //*************************beginning of critical section
+
      while (buffer2[buf2Indx] != 3) {
           if (buffer2[buf2Indx] == '+' && buffer2[buf2Indx + 1] == '+') {
                buffer3[buf3Indx] = '^';
@@ -166,17 +178,19 @@ void replaceSubstrs() {
           buf3Indx++;
      }	// end of while loop
      buffer3[buf3Indx] = buffer2[buf2Indx];  // transfer the "end of text" char
-     buffer3[buf3Indx] = buffer2[buf2Indx];  // extra transfer(?)
+
+
+     //**************************end of critical section
 
      return;
 }
 
 
 /************************************************************
- * function to get processed data from the buffer shared with
- * Plus Sign Thread and write it to std output as lines of
- * exactly 80 characters. excess characters at the end numbering
- * fewer than 80 are ignored.
+ * Function that the output thread will run. Get processed data
+ * from the buffer shared with plus sign thread and write it to
+ * std output as lines of exactly 80 characters. excess characters
+ * at the end, numbering fewer than 80 are ignored.
 *************************************************************/
 void printOutput() {
      int charsPerLine = 80;
@@ -188,6 +202,10 @@ void printOutput() {
 
      int k = 0;     // counter of all chars in the input
      while (1) {
+
+          //*************************beginning of critical section
+
+
           for(; tempBufIndx < charsPerLine; tempBufIndx++){ // loop of n-char line
                //check for EOT character
                if (buffer3[buf3Indx] == 3) {
@@ -204,6 +222,10 @@ void printOutput() {
 
           // reset the temp buffer to beginning for next n-char line;
           tempBufIndx = 0;
+
+          //**************************end of critical section
+
+
      } // end of while loop
 
 }
