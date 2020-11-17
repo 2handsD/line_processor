@@ -19,10 +19,19 @@
 
 int main()
 {
-     readInput();
-     replaceLineSeparators();
-     replaceSubstrs();
-     printOutput();
-     
+     pthread_t input_t, lineSeparator_t, plusSign_t, output_t;
+
+     // Create the threads
+     pthread_create(&input_t, NULL, readInput, NULL);
+     pthread_create(&lineSeparator_t, NULL, replaceLineSeparators, NULL);
+     pthread_create(&plusSign_t, NULL, replaceSubstrs, NULL);
+     pthread_create(&output_t, NULL, printOutput, NULL);
+
+     // wait for the threads to terminate
+     pthread_join(input_t, NULL);
+     pthread_join(lineSeparator_t, NULL);
+     pthread_join(plusSign_t, NULL);
+     pthread_join(output_t, NULL);
+
     return EXIT_SUCCESS;
 }

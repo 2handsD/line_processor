@@ -69,9 +69,9 @@ pthread_cond_t full3 = PTHREAD_COND_INITIALIZER;
  * from std input and place them in a the buffer shared with
  * the Line Separator thread (buffer 1)
 *************************************************************/
-void readInput() {
+void *readInput(void *args) {
      /* get the first line of characters, including the line
-     separator, and put it in the buffer
+     separator at the end, and put it in the buffer
      source: C for Dummies Blog; https://c-for-dummies.com/blog/?p=1112 */
      
      size_t buf1Size = MAX_LINES * MAX_CHARACTERS_PER_LINE;  // must agree with buffer declaration
@@ -79,23 +79,42 @@ void readInput() {
      //char buffer1[bufSize];
      char* bufPointer = buffer1;   //this pointer starts at the beginning of the array
      size_t curLineSize;           // size, in chars, of the current line of input
-     int nextBufIndex = 0;         // index num of next array element
+     int nextBufIndex = 0;         // IS THIS NECESSARY?
      char stopProcessingLine[] = { 'S','T','O','P','\n' };
 
-     //*************************beginning of critical section
+
+
 
      while (1) {
+          //*************************beginning of critical section
+
+          // Lock the mutex before putting a line of input in buffer 1
+          pthread_mutex_lock(&mutex1);
+
           /* get the lines of input from stdin, store them
              in the buffer shared with the Line Separator thread */
           curLineSize = getline(&bufPointer, &buf1Size, stdin);
 
+          
+
           if (strcmp(bufPointer, stopProcessingLine) == 0) {
+               // unlock the mutex
+               pthread_mutex_unlock(&mutex1);
                break;
           }
           else {
-               nextBufIndex += curLineSize;
-               bufPointer = &buffer1[nextBufIndex];
+               //increment the index where the next item will be put
+               prodIndx1 += curLineSize;
+               count1 += 1;
+
+               bufPointer = &buffer1[nextBufIndex];    // IS THIS NECESSARY?
+               //signal line separator thread that there is data in buffer 1
+               pthread_cond_signal(&full1);
+               //unlock the mutex
+               pthread_mutex_unlock(&mutex1);
           } // end of if-else
+
+          //**************************end of critical section
 
      } // end of while loop
 
@@ -103,9 +122,7 @@ void readInput() {
         This will mark the 'end of text' for other threads*/
      *bufPointer = 3;
 
-     //**************************end of critical section
-
-     return;
+     return NULL;
 }
 
 
@@ -116,33 +133,66 @@ void readInput() {
  *  Puts resulting string in the buffer shared with the plus
  *  sign thread (buffer 2).
 *************************************************************/
-void replaceLineSeparators() {
+void *replaceLineSeparators(void *args) {
 
      char replaceMeChar = '\n';
      char replacementChar = ' ';
 
-     int i = 0;     // array index
-
      //*************************beginning of critical section
 
-     //loop until designated "end of text" ascii code is found
-     while (buffer1[i] != 3) {  
-          if (buffer1[i] == replaceMeChar) {
-               buffer2[i] = replacementChar;
-          }
-          else
-          {
-               buffer2[i] = buffer1[i];
-          }
+     //lock the mutex before checking if buffer has data
+     pthread_mutex_lock(&mutex1);
 
-          i++;
+     while (count1 == 0) {
+          // buffer is empty. wait for producer to signal that the buffer has data
+          pthread_cond_wait(&full1, &mutex1);
      }
-     buffer2[i] = buffer1[i];  // transfer the "end of text" char
+
+     //loop until designated "end of text" ascii code is found
+     while (buffer1[conIndx1] != 3) {
+               
+               if (buffer1[conIndx1] == replaceMeChar) {
+                    // lock the mutex for buffer 2 before accessing
+                    pthread_mutex_lock(&mutex2);
+                    buffer2[prodIndx2] = replacementChar;
+                    count2 += 1;
+               }
+               else
+               {
+                    buffer2[prodIndx2] = buffer1[conIndx1];
+                    count2 += 1;
+               }
+               // increment the indeces
+               conIndx1 += 1;
+               prodIndx2 += 1;
+
+               // decrement the count of buffer 1
+               count1 -= 1;
+
+               // signal to the consumer that the buffer is not empty
+               pthread_cond_signal(&full2);
+
+               // unlock the mutexes
+               pthread_mutex_unlock(&mutex2);
+               pthread_mutex_unlock(&mutex1);
+     }
+     // lock the mutex
+     pthread_mutex_lock(&mutex2);
+
+     //add the "end of text" char to the new array
+     buffer2[prodIndx2] = '3';
+     count2 += 1;
+
+     // signal to the consumer that the buffer is not empty
+     pthread_cond_signal(&full2);
+
+     // unlock the mutex
+     pthread_mutex_unlock(&mutex2);
 
      //**************************end of critical section
 
 
-     return;
+     return NULL;
 }
 
 
@@ -154,35 +204,60 @@ void replaceLineSeparators() {
  * the output thread (buffer 3)
  ******************************************************/
 
-void replaceSubstrs() {
-     int buf2Indx = 0;	// index for buffer 2
-     int buf3Indx = 0;   // index for buffer 3
-
-     /* loop repeats until all instances are replaced, or the
+void *replaceSubstrs(void *args) {
+     /* while loop repeats until all instances are replaced, or the
         "end of text" char (ascii value 3) is encountered
      */
 
      //*************************beginning of critical section
+     // lock mutex2 before checking if buffer has data
+     pthread_mutex_lock(&mutex2);
 
-     while (buffer2[buf2Indx] != 3) {
-          if (buffer2[buf2Indx] == '+' && buffer2[buf2Indx + 1] == '+') {
-               buffer3[buf3Indx] = '^';
-               buf2Indx++;	// an extra increment to skip the 2nd '+'
+     while (count2 == 0) {
+          // buffer has no new data. wait for producer to signal that the buffer has data
+          pthread_cond_wait(&full2, &mutex2);
+     }
+
+     while (buffer2[conIndx2] != 3) {
+          if (buffer2[conIndx2] == '+' && buffer2[conIndx2 + 1] == '+') {
+               // lock mutex 3 before accessing it
+               pthread_mutex_lock(&mutex3);
+               buffer3[prodIndx3] = '^';
+               
+               conIndx2 += 1;  // an extra increment to skip the 2nd '+'
+               count2 -= 1;    // because we skipped a '+'
           }
           else
           {
-               buffer3[buf3Indx] = buffer2[buf2Indx];
+               buffer3[prodIndx3] = buffer2[conIndx2];
 
           }
-          buf2Indx++;
-          buf3Indx++;
-     }	// end of while loop
-     buffer3[buf3Indx] = buffer2[buf2Indx];  // transfer the "end of text" char
 
+          // update the indices and counts
+          conIndx2 += 1;
+          prodIndx3 += 1;
+          count2 -= 1;
+          count3 += 1;
+
+          // signal to the consumer that the buffer is not empty
+          pthread_cond_signal(&full3);
+
+          // unlock the mutexes
+          pthread_mutex_unlock(&mutex3);
+          pthread_mutex_unlock(&mutex2);
+
+     }	// end of while loop
+
+     // lock the mutex
+     pthread_mutex_lock(&mutex3);
+     //add the "end of text" char to the arrray
+     buffer3[prodIndx3] = 3;  // transfer the "end of text" char
+     // unlock the mutex
+     pthread_mutex_unlock(&mutex3);
 
      //**************************end of critical section
 
-     return;
+     return NULL;
 }
 
 
@@ -192,30 +267,43 @@ void replaceSubstrs() {
  * std output as lines of exactly 80 characters. excess characters
  * at the end, numbering fewer than 80 are ignored.
 *************************************************************/
-void printOutput() {
+void *printOutput(void *args) {
      int charsPerLine = 80;
      char tempBuffer[charsPerLine + 1];  // Adds room for null terminator
      tempBuffer[80] = '\0';   // null terminator at the end
 
-     int buf3Indx = 0;   // array index var for buffer 3
      int tempBufIndx = 0;    // array index var for temporary buffer
 
-     int k = 0;     // counter of all chars in the input
      while (1) {
 
+          
           //*************************beginning of critical section
+          
+          // lock the mutex for buffer 3
+          pthread_mutex_lock(&mutex3);
 
+          while (count3 == 0); {
+               // buffer 3 has no new data. wait for the produceR to signal new data
+               pthread_cond_wait(&full3, &mutex3);
+          }
 
           for(; tempBufIndx < charsPerLine; tempBufIndx++){ // loop of n-char line
                //check for EOT character
-               if (buffer3[buf3Indx] == 3) {
-                    return;
+               if (buffer3[conIndx3] == 3) {
+                    return NULL;
                }
                
-               tempBuffer[tempBufIndx] = buffer3[buf3Indx];
-               buf3Indx++;
-               k++;
+               tempBuffer[tempBufIndx] = buffer3[conIndx3];
+               // increment the index from which the item will be picked-up
+               conIndx3 += 1;
+               // decrement the count of buffer 3
+               count3 -= 1;
+
+               // unlock the mutex
+               pthread_mutex_unlock(&mutex2);
           }
+
+          //**************************end of critical section
 
           // print the 80-char line to std output
           printf("%s\n",tempBuffer);
@@ -223,7 +311,7 @@ void printOutput() {
           // reset the temp buffer to beginning for next n-char line;
           tempBufIndx = 0;
 
-          //**************************end of critical section
+          
 
 
      } // end of while loop
