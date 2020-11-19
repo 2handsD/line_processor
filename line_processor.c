@@ -24,14 +24,20 @@ int main()
      // Create the threads
      pthread_create(&input_t, NULL, readInput, NULL);
      pthread_create(&lineSeparator_t, NULL, replaceLineSeparators, NULL);
+
      pthread_create(&plusSign_t, NULL, replaceSubstrs, NULL);
-     pthread_create(&output_t, NULL, printOutput, NULL);
+     //pthread_create(&output_t, NULL, printOutput, NULL);
+     //void* args1;
+     //void* args2;
+     //replaceSubstrs(args1);
+     //printOutput(args2);
+
 
      // wait for the threads to terminate
      pthread_join(input_t, NULL);
      pthread_join(lineSeparator_t, NULL);
      pthread_join(plusSign_t, NULL);
-     pthread_join(output_t, NULL);
+     //pthread_join(output_t, NULL);
 
     return EXIT_SUCCESS;
 }
