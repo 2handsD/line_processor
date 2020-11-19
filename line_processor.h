@@ -70,7 +70,7 @@ pthread_cond_t full3 = PTHREAD_COND_INITIALIZER;
  * the Line Separator thread (buffer 1)
 *************************************************************/
 void *readInput(void *args) {
-     //printf("t1: in the fn readInput\n");
+     printf("t1: in the fn readInput\n");
      /* get the first line of characters, including the line
      separator at the end, and put it in buffer 1.
      source: C for Dummies Blog; https://c-for-dummies.com/blog/?p=1112 */
@@ -165,15 +165,10 @@ void *replaceLineSeparators(void *args) {
      pthread_mutex_lock(&mutex1);
 
      printf("\nt2: count1 == %d\n", count1);
-     printf("t2: count2 == %d\n", count2);
-     printf("t2: conIndx1 == %d\n", conIndx1);
-     printf("t2: prodIndx2 == %d\n", prodIndx2);
-     printf("t2 buffer1 as %%s == %s\n", buffer1);
-     printf("t2 buffer2 as %%s == %s\n\n", buffer2);
 
 
      while (count1 == 0) {
-          printf("t2: buf 1 empty. waiting for signal fr thread 1\n");
+          printf("t2: buf 1 no new data. waiting for signal fr thread 1\n");
           // buffer1 has no new data. wait for producer to signal that the buffer has data
           pthread_cond_wait(&full1, &mutex1);
      }
@@ -280,6 +275,8 @@ void *replaceSubstrs(void *args) {
      // lock mutex2 before checking if buffer has data
      pthread_mutex_lock(&mutex2);
 
+     printf("t3: count2 == %d\n", count2);
+
      /* while loop repeats until all instances are replaced, or the
       "end of text" char (ascii value 3) is encountered
      */
@@ -345,17 +342,17 @@ void *replaceSubstrs(void *args) {
      }	// end of while loop
 
 
-     // lock mutex 3
-     pthread_mutex_lock(&mutex3);
-     //add the "end of text" char to the arrray
-     buffer3[prodIndx3] = 3;  // transfer the "end of text" char
-     // signal output thread that there is new data in the array
-     pthread_cond_signal(&full3);
-     // unlock the mutex
-     pthread_mutex_unlock(&mutex3);
-     // terminate the thread
-     void* retval;
-     pthread_exit(retval);
+     //// lock mutex 3
+     //pthread_mutex_lock(&mutex3);
+     ////add the "end of text" char to the arrray
+     //buffer3[prodIndx3] = 3;  // transfer the "end of text" char
+     //// signal output thread that there is new data in the array
+     //pthread_cond_signal(&full3);
+     //// unlock the mutex
+     //pthread_mutex_unlock(&mutex3);
+     //// terminate the thread
+     //void* retval;
+     //pthread_exit(retval);
 
      //**************************end of critical section
 
@@ -370,7 +367,7 @@ void *replaceSubstrs(void *args) {
  * at the end, numbering fewer than 80 are ignored.
 *************************************************************/
 void *printOutput(void *args) {
-     printf("in the fn printOutput\n");
+     printf("t4: in the fn printOutput\n");
 
      int charsPerLine = 80;
      char tempBuffer[charsPerLine + 1];  // Adds room for null terminator
@@ -378,34 +375,41 @@ void *printOutput(void *args) {
 
      int tempBufIndx = 0;    // array index var for temporary buffer
 
+
+//*************************beginning of critical section
+
+     
+          
+     // lock the mutex for buffer 3
+     pthread_mutex_lock(&mutex3);
+     printf("t4: count3 == %d\n", count3);
+
+     while (count3 == 0); {
+          // buffer 3 has no new data. wait for the producer to signal new data
+          printf("t4: buf 3 no new data. waiting for signal fr thread 3\n");
+          pthread_cond_wait(&full3, &mutex3);
+     }
+
      while (1) {
-
-          
-          //*************************beginning of critical section
-          
-          // lock the mutex for buffer 3
-          pthread_mutex_lock(&mutex3);
-
-          while (count3 == 0); {
-               // buffer 3 has no new data. wait for the producer to signal new data
-               pthread_cond_wait(&full3, &mutex3);
-          }
-
           for(; tempBufIndx < charsPerLine; tempBufIndx++){ // loop of n-char line
                //check for EOT character
                if (buffer3[conIndx3] == 3) {
+                    printf("t4: EOT char encountered. terminating t4.\n");
+                    printf("t2: tempBuffer as %%s == %s\n", tempBuffer);
+
                     // terminate the thread
                     void* retval;
                     pthread_exit(retval);
-                    return NULL;             // IS THIS NECESSARY?
                }
                
+
                tempBuffer[tempBufIndx] = buffer3[conIndx3];
+               printf("tempBuffer[%d] gets buffer3[%d]\n", tempBufIndx, conIndx3);
                // increment the index from which the item will be picked-up
                conIndx3 += 1;
 
-               //// decrement the count of buffer 3
-               //count3 -= 1;                          //I TOOK THIS OUT
+               // decrement the count of buffer 3
+               count3 -= 1;
 
                // unlock the mutex
                pthread_mutex_unlock(&mutex3);
